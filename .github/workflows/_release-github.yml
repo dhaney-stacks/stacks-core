@@ -274,3 +274,5 @@ jobs:
         with:
           tag: ${{ inputs.tag }}
           digest_manifest: /tmp/digest-manifest.json
+          release-app-id: ${{ secrets.RELEASE_APP_ID }}
+          release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
