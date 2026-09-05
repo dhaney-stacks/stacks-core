@@ -60,7 +60,7 @@ runs:
     
             info "Generated checksums:"
             echo "${shasum}"
-            echo "${shasum}" > "../${{ inputs.hashfile_name }}"
+            echo "${shasum}" > "${{ inputs.hashfile_name }}"
 
         # Generate the release body from the template and changelog
         - name: Draft Release Body
