@@ -83,7 +83,7 @@ runs:
           id: generate-token
           uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
           with:
-            client-id: ${{ inputs.release-app-id }}
+            client-id: ${{ inputs.release-app-client-id }}
             private-key: ${{ inputs.release-app-private-key }}
 
         # Create the release with attached archives, checksums file, and attestations
