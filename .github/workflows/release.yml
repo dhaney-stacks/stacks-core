@@ -167,7 +167,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag }}
+          TAG: ${{ needs.check-release.outputs.tag }}
         run: |
           # The blocker label is the 3-part version (X.Y.Z) of the release tag, i.e. "4.0.0-blocker".
           # Anything after the 3-part version (i.e. "-rc1", or extra version parts) is ignored.
