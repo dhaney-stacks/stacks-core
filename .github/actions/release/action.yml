@@ -103,4 +103,4 @@ runs:
               generate_release_notes: false
               files: |
                   release/*.zip
-                  CHECKSUMS.txt
+                  ${{ inputs.hashfile_name }}
