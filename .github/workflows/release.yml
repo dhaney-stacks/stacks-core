@@ -149,6 +149,8 @@ jobs:
   # If there are any open issues or PRs labeled "X.Y.Z-blocker", abort the release (and let us know)
   check-release-blockers:
     name: 'Check for Open "<version>-blocker" Issues/PRs'
+    needs:
+      - check-release
     if: >-
       needs.check-release.outputs.tag != '' &&
       needs.check-release.outputs.is_release == 'true'
