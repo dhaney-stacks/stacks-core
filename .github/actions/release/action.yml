@@ -103,4 +103,4 @@ runs:
               generate_release_notes: false
               files: |
                   release/*.zip
-                  ${{ inputs.hashfile_name }}
+                  release/${{ inputs.hashfile_name }}
