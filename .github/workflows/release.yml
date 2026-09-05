@@ -81,6 +81,9 @@ jobs:
   ############################################################################
   check-release:
     name: "Check: Release"
+    needs:
+      - check-ci-enabled
+      - setup-env
     # Execute if ENABLE_CI_WORKFLOWS GitHub Actions variable is 'true' or we're on the official repository
     if: vars.ENABLE_CI_WORKFLOWS == 'true' || github.repository == 'stacks-network/stacks-core'
     runs-on: *shared_config
