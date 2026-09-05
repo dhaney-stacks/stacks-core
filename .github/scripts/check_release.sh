@@ -71,7 +71,7 @@ else
         info "is_release=false"
     fi
 
-    write_summary "### Release Detection Summary\n* **Release Detected:** \`false\`\n* **Reason:** Branch \`${BRANCH}\` does not match release pattern (\`release/x.x.x\`)."
+    write_summary "## Release Detection Summary\n* **Release Detected:** \`false\`\n* **Reason:** Branch \`${BRANCH}\` does not match release pattern (\`release/x.x.x\`)."
     exit 0
 fi
 
@@ -110,4 +110,4 @@ else
     info "is_release=${info:-${tag}}"
 fi
 
-write_summary "### Release Detection Summary\n* **Release Detected:** \`true\`\n* **Tag:** \`${tag}\`\n* **Reason:** Branch \`${BRANCH}\` matches release pattern and verified against \`${versions_file}\`."
+write_summary "## Release Detection Summary\n* **Release Detected:** \`true\`\n* **Tag:** \`${tag}\`\n* **Reason:** Branch \`${BRANCH}\` matches release pattern and verified against \`${versions_file}\`."
