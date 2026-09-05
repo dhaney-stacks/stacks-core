@@ -1,0 +1,190 @@
+############################################################################
+### Our release CI/CD workflow
+############################################################################
+
+name: "Release"
+run-name: "Release: [${{ github.ref_name }}]"
+
+on:
+  workflow_dispatch: # Allows manual triggering
+
+# Set default permissions for all jobs
+permissions:
+  contents: read
+
+# Set default shell
+defaults:
+  run:
+    shell: bash
+
+# Configure concurrency
+concurrency:
+  group: release-${{ github.head_ref || github.ref || github.run_id }}
+  # Always cancel duplicate jobs
+  cancel-in-progress: true
+
+# Env vars
+env:
+  TEST_ARCHIVE_FILE: "./test_archive.tar.zst"
+
+jobs:
+  check-ci-enabled:
+    name: "Check: CI Enabled"
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        run: |
+          echo "=== CI Enablement Check ==="
+          echo "ENABLE_CI_WORKFLOWS: '${{ vars.ENABLE_CI_WORKFLOWS }}'"
+          echo "github.repository:   '${{ github.repository }}'"
+    
+          if [[ "${{ vars.ENABLE_CI_WORKFLOWS }}" == "true" || "${{ github.repository }}" == "stacks-network/stacks-core" ]]; then
+            echo "Result: CI is ENABLED"
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Result: CI is DISABLED"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  ############################################################################
+  ### Global Variables Setup
+  ###
+  ### Bridges global env variables to the jobs context so they are safely
+  ### accessible by downstream reusable workflows.
+  ### Also defines default runs-on anchor.
+  ############################################################################
+  setup-env:
+    name: "Setup: Global Variables"
+    needs:
+      - check-ci-enabled
+    if: needs.check-ci-enabled.outputs.enabled == 'true'
+    runs-on: &shared_config ubuntu-latest
+    outputs:
+      test-archive-file: ${{ steps.set-env.outputs.test_archive_file }}
+    steps:
+      - name: Export Env Variables
+        id: set-env
+        run: |
+          # Capture the archive file input, then expand the leading ~ to $HOME
+          INPUT_FILE="${{ env.TEST_ARCHIVE_FILE }}"
+          ARCHIVE_FILE="${INPUT_FILE/#\~/$HOME}"
+
+          echo "test_archive_file=$ARCHIVE_FILE" >> $GITHUB_OUTPUT
+
+  ############################################################################
+  ### Release Check
+  ###
+  ### Checks if this is a release build
+  ### If true, will execute release jobs
+  ############################################################################
+  check-release:
+    name: "Check: Release"
+    # Execute if ENABLE_CI_WORKFLOWS GitHub Actions variable is 'true' or we're on the official repository
+    if: vars.ENABLE_CI_WORKFLOWS == 'true' || github.repository == 'stacks-network/stacks-core'
+    runs-on: *shared_config
+    outputs:
+      tag: ${{ steps.check-release.outputs.tag }}
+      is_release: ${{ steps.check-release.outputs.is_release }}
+    steps:
+      # Checkout the code
+      #   - only .github and versions.toml are required for this job
+      - name: Checkout the latest code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          sparse-checkout: |
+            .github
+            versions.toml
+
+      # Run script to check if this is a release and set outputs
+      - name: Check Release
+        id: check-release
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: bash ./.github/scripts/check_release.sh
+
+  ############################################################################
+  ### Check Reusable Test Caches
+  ###
+  ### Caches can only be created from `main`. The workflow will fail
+  ### if caches are missing, with instructions on how to manually seed them.
+  ############################################################################
+  check-test-caches:
+    name: "Check: Test Caches"
+    needs:
+      - setup-env
+    uses: ./.github/workflows/_check-test-caches.yml
+
+  ############################################################################
+  ### Create Nextest Archive Artifact for Tests
+  ############################################################################
+  create-nextest-archive:
+    name: "Create: Nextest Archive Artifact"
+    runs-on: *shared_config
+    needs:
+      - check-test-caches
+      - setup-env
+    steps:
+      # Checkout the code
+      #   - only .github is required for this job
+      - name: Checkout the latest code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.ref }}
+          sparse-checkout: |
+            .github
+
+      # Create Nextest archive artifact
+      - name: Create Nextest Archive Artifact
+        uses: ./.github/actions/artifacts/nextest-archive
+        with:
+          action: create
+          archive-file: ${{ needs.setup-env.outputs.test-archive-file }}
+
+  ############################################################################
+  ### Run Epoch Tests (Release Only)
+  ############################################################################
+  tests-epoch:
+    name: "Tests: Epoch (Release Only)"
+    needs:
+      - check-release
+      - check-test-caches
+      - create-nextest-archive
+      - setup-env
+    if: >-
+      needs.check-release.outputs.is_release == 'true' &&
+      github.event_name != 'merge_group'
+    uses: ./.github/workflows/_tests-epoch.yml
+    with:
+      archive-file: ${{ needs.setup-env.outputs.test-archive-file }}
+      upload-junit-xml: ${{ needs.setup-env.outputs.create-slow-failed-tests-summary }}
+      upload-code-coverage: ${{ needs.setup-env.outputs.create-code-coverage-report }}
+
+  ############################################################################
+  ### Create Release
+  ###
+  ### Creates binary archives for several architectures
+  ### Creates Docker images and pushes to ghcr registry
+  ### Creates a draft GitHub release
+  ############################################################################
+  create-release:
+    name: "Create: Release"
+    needs:
+      - check-release
+      - tests-epoch
+    if: >-
+      needs.check-release.outputs.is_release == 'true' &&
+      github.event_name != 'merge_group'
+    permissions:
+      contents: write        # required for github release
+      id-token: write        # required for attestation
+      attestations: write    # required for attestation
+      packages: write        # required for image push to ghcr
+      issues: read           # required for release blocker check
+      pull-requests: read    # required for release blocker check
+    uses: ./.github/workflows/_release-github.yml
+    secrets: inherit         # required for secrets to be available to this workflow
+    with:
+      tag: ${{ needs.check-release.outputs.tag }} # 3-part version shared by the node and signer, like 4.0.0
