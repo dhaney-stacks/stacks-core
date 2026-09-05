@@ -236,8 +236,8 @@ jobs:
     needs:
       - check-changelog
       - check-rustfmt
-      - setup-env
       - check-test-caches
+      - setup-env
     steps:
       # Checkout the code
       #   - only .github is required for this job
@@ -262,10 +262,13 @@ jobs:
     name: "Tests: Stacks Core"
     needs:
       - check-changelog
+      - check-release
       - check-rustfmt
       - check-test-caches
       - create-nextest-archive
       - setup-env
+    if: >-
+      needs.check-release.outputs.is_release != 'true'
     uses: ./.github/workflows/_tests-stacks-core.yml
     with:
       archive-file: ${{ needs.setup-env.outputs.test-archive-file }}
@@ -279,10 +282,13 @@ jobs:
     name: "Tests: Bitcoin"
     needs:
       - check-changelog
+      - check-release
       - check-rustfmt
       - check-test-caches
       - create-nextest-archive
       - setup-env
+    if: >-
+      needs.check-release.outputs.is_release != 'true'
     uses: ./.github/workflows/_tests-bitcoin.yml
     with:
       archive-file: ${{ needs.setup-env.outputs.test-archive-file }}
@@ -296,10 +302,13 @@ jobs:
     name: "Tests: Bitcoin RPC"
     needs:
       - check-changelog
+      - check-release
       - check-rustfmt
       - check-test-caches
       - create-nextest-archive
       - setup-env
+    if: >-
+      needs.check-release.outputs.is_release != 'true'
     uses: ./.github/workflows/_tests-bitcoin-rpc.yml
     with:
       archive-file: ${{ needs.setup-env.outputs.test-archive-file }}
@@ -311,10 +320,13 @@ jobs:
     name: "Tests: P2P"
     needs:
       - check-changelog
+      - check-release
       - check-rustfmt
       - check-test-caches
       - create-nextest-archive
       - setup-env
+    if: >-
+      needs.check-release.outputs.is_release != 'true'
     uses: ./.github/workflows/_tests-p2p.yml
     with:
       archive-file: ${{ needs.setup-env.outputs.test-archive-file }}
@@ -328,8 +340,8 @@ jobs:
     name: "Tests: Epoch (Release Only)"
     needs:
       - check-changelog
-      - check-rustfmt
       - check-release
+      - check-rustfmt
       - check-test-caches
       - create-nextest-archive
       - setup-env
@@ -373,7 +385,6 @@ jobs:
   ### Create Job Summary: Slow & Failed Tests
   ############################################################################
   create-slow-failed-tests-summary:
-    if: always() && needs.setup-env.outputs.create-slow-failed-tests-summary == 'true'
     name: "Create: Slow & Failed Tests Report"
     runs-on: *shared_config
     needs:
@@ -386,6 +397,10 @@ jobs:
       - tests-epoch
       - tests-p2p
       - tests-stacks-core
+    if: >-
+      always() && 
+      needs.setup-env.outputs.create-slow-failed-tests-summary == 'true' && 
+      needs.check-release.outputs.is_release != 'true'
     env:
       NEXTEST_FILES_DIR: "nextest_files"
       NEXTEST_FILES_EXT: "xml"
@@ -527,7 +542,6 @@ jobs:
   ### Create Code Coverage Report
   ############################################################################
   create-code-coverage-report:
-    if: always() && needs.setup-env.outputs.create-code-coverage-report == 'true'
     name: "Create: Code Coverage Report"
     runs-on: *shared_config
     needs:
@@ -540,6 +554,10 @@ jobs:
       - tests-epoch
       - tests-p2p
       - tests-stacks-core
+    if: >-
+      always() && 
+      needs.setup-env.outputs.create-code-coverage-report == 'true' &&
+      needs.check-release.outputs.is_release != 'true'
     env:
       REPORT_FILES_DIR: "code_coverage_files"
       REPORT_FILES_EXT: "info"
